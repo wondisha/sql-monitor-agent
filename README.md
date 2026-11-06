@@ -26,7 +26,7 @@ Agentic monitoring and troubleshooting for **Snowflake, PostgreSQL, MySQL and SQ
 python -m venv .venv
 .\.venv\Scripts\pip install -e ".[all,dev]"
 copy .env.example .env          # fill in ANTHROPIC_API_KEY, MONITOR_USERS, webhooks, Snowflake keys
-.\.venv\Scripts\pytest -q       # 65 tests; no databases or API key needed
+.\.venv\Scripts\pytest -q       # 76 tests; no databases or API key needed
 
 # local fault lab (Docker Desktop must be running). Lab ports are 55432 / 33306 / 14330 so they never
 # collide with databases already installed on the default ports.
