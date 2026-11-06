@@ -58,6 +58,14 @@ def test_correlator_dedups_flaps_and_resolves(db):
     with session_scope() as s:
         assert len(corr.resolve_stale(s, healthy_targets={"pg1"})) == 1
 
+    cleared: set[str] = set()   # a healthy reading resolves the incident immediately, no 15-minute wait
+    eng.evaluate("pg1", "postgres", [Metric("blocking_max_wait_seconds", 5)], cleared)
+    assert "pg1|blocking_long|" in cleared
+    with session_scope() as s:
+        u_open = corr.process(s, ev)[0].incident.id          # reopen first (it was auto-resolved above)
+    with session_scope() as s:
+        assert [i.id for i in corr.resolve_recovered(s, cleared)] == [u_open]
+
     with session_scope() as s:  # fires again within cooldown -> same incident reopened, not a new page
         u3 = corr.process(s, ev)
     assert not u3[0].is_new and u3[0].incident.id == u1[0].incident.id and u3[0].incident.status == "open"

@@ -97,13 +97,16 @@ class App:
         with session_scope() as s:
             s.add_all(MetricSample(ts=ts, target=target, name=m.name, labels_key=m.labels_key, value=float(m.value))
                       for m in metrics)
-        events = self.rules.evaluate(target, adapter.engine, metrics)
-        self._handle_events(events)
+        cleared: set[str] = {f"{target}|{COLLECTOR_ERROR_RULE.id}|"}   # collection worked -> reachable again
+        events = self.rules.evaluate(target, adapter.engine, metrics, cleared)
+        self._handle_events(events, cleared)
         return events
 
-    def _handle_events(self, events: list[Event]) -> None:
+    def _handle_events(self, events: list[Event], cleared: set[str] | None = None) -> None:
         new_ids = []
         with session_scope() as s:
+            for inc in self.correlator.resolve_recovered(s, cleared or set()):
+                self.notifier.incident_resolved(inc)
             for upd in self.correlator.process(s, events):
                 if upd.is_new or upd.escalated:
                     self.notifier.incident_opened(upd.incident)

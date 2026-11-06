@@ -74,8 +74,13 @@ class RuleEngine:
     def from_config(cls, rule_dicts: list[dict], baseline: BaselineFn | None = None) -> "RuleEngine":
         return cls([Rule.from_dict(d) for d in rule_dicts], baseline)
 
-    def evaluate(self, target: str, engine: str, metrics: list[Metric]) -> list[Event]:
+    def evaluate(self, target: str, engine: str, metrics: list[Metric],
+                 cleared: set[str] | None = None) -> list[Event]:
+        """Return breaches. If `cleared` is given, keys that were checked and found healthy are added to it
+        (the caller owns the set, so concurrent collections for different targets don't share state)."""
         events: list[Event] = []
+        if cleared is None:
+            cleared = set()
         for rule in self.rules:
             if not rule.applies_to(engine):
                 continue
@@ -86,6 +91,7 @@ class RuleEngine:
                 breached, detail = self._check(rule, target, m)
                 if not breached:
                     self._streak.pop(key, None)
+                    cleared.add(key)
                     continue
                 self._streak[key] = self._streak.get(key, 0) + 1
                 if self._streak[key] >= rule.for_cycles:

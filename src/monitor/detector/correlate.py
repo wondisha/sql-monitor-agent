@@ -68,6 +68,18 @@ class Correlator:
             updates.append(IncidentUpdate(inc, is_new=True))
         return updates
 
+    def resolve_recovered(self, s: Session, cleared_keys: set[str]) -> list[Incident]:
+        """Resolve open incidents whose check just ran and came back healthy."""
+        if not cleared_keys:
+            return []
+        resolved = []
+        for inc in s.scalars(select(Incident).where(Incident.status.in_(OPEN_STATES),
+                                                    Incident.dedup_key.in_(cleared_keys))):
+            inc.status, inc.resolved_at = "resolved", utcnow()
+            s.add(IncidentEvent(incident_id=inc.id, kind="resolved", detail={"reason": "check passed again"}))
+            resolved.append(inc)
+        return resolved
+
     def resolve_stale(self, s: Session, healthy_targets: set[str]) -> list[Incident]:
         """Resolve incidents that stopped firing - only for targets we can currently observe."""
         cutoff = utcnow() - self.auto_resolve
