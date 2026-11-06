@@ -1,0 +1,12 @@
+.env
+.venv/
+__pycache__/
+*.pyc
+*.db
+*.egg-info/
+.pytest_cache/
+
+# machine-specific: servers added from the dashboard (account ids, local key paths)
+config/targets_ui.yaml
+*.tmp
+

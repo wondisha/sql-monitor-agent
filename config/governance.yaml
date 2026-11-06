@@ -1,0 +1,15 @@
+# Snowflake inactive-user cleanup.
+snowflake_inactive_users:
+  enabled: true
+  targets: [prod-snowflake]
+  dry_run: true                 # first install: report only. Set false once you trust the output.
+  inactive_days: 90
+  grace_period_days: 14         # time between disable and revoke+drop
+  max_users_per_run: 25
+  max_flagged_pct: 20           # abort the run if more than this % of users get flagged
+  include_service_users: false  # TYPE = SERVICE / LEGACY_SERVICE are skipped unless true
+  protected_roles: [ACCOUNTADMIN, SECURITYADMIN, ORGADMIN, SYSADMIN, USERADMIN]
+  allowlist_users: []           # exact user names that are never touched
+  keep_tag: ""                  # e.g. GOVERNANCE.TAGS.KEEP_USER - users with this tag = 'true' are skipped
+  keep_days: 90                 # how long a "keep" decision from the dashboard lasts
+  roles_never_revoked: [PUBLIC]

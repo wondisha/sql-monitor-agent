@@ -1,0 +1,107 @@
+# Rule fields:
+#   id, engines (list or [any]), metric, op (> >= < <= == !=), threshold,
+#   for_cycles (consecutive breaches before firing, default 1), severity P1..P4, title
+# type: anomaly rules use z_score on the metric's 7-day baseline instead of threshold.
+
+rules:
+  - id: blocking_long
+    engines: [postgres, mysql, mssql]
+    metric: blocking_max_wait_seconds
+    op: ">"
+    threshold: 60
+    severity: P2
+    title: "Session blocked for more than 60s"
+
+  - id: blocked_sessions_many
+    engines: [postgres, mysql, mssql]
+    metric: blocked_sessions
+    op: ">="
+    threshold: 5
+    for_cycles: 2
+    severity: P2
+    title: "Five or more sessions are blocked"
+
+  - id: long_running_query
+    engines: [postgres, mysql, mssql]
+    metric: longest_query_seconds
+    op: ">"
+    threshold: 900
+    severity: P3
+    title: "Query running longer than 15 minutes"
+
+  - id: idle_in_transaction
+    engines: [postgres]
+    metric: idle_in_txn_max_seconds
+    op: ">"
+    threshold: 600
+    severity: P3
+    title: "Session idle in transaction for more than 10 minutes"
+
+  - id: long_transaction
+    engines: [mysql]
+    metric: longest_trx_seconds
+    op: ">"
+    threshold: 900
+    severity: P3
+    title: "InnoDB transaction open for more than 15 minutes"
+
+  - id: connections_high
+    engines: [postgres, mysql]
+    metric: connection_pct
+    op: ">"
+    threshold: 85
+    for_cycles: 2
+    severity: P2
+    title: "Connections above 85% of max"
+
+  - id: replication_lag
+    engines: [postgres, mysql, mssql]
+    metric: replication_lag_seconds
+    op: ">"
+    threshold: 300
+    for_cycles: 2
+    severity: P2
+    title: "Replication lag above 5 minutes"
+
+  - id: deadlocks
+    engines: [postgres, mysql, mssql]
+    metric: deadlocks_delta
+    op: ">"
+    threshold: 0
+    severity: P3
+    title: "Deadlocks detected"
+
+  - id: table_bloat
+    engines: [postgres]
+    metric: max_dead_tuple_pct
+    op: ">"
+    threshold: 30
+    for_cycles: 3
+    severity: P4
+    title: "Table with more than 30% dead tuples (autovacuum falling behind)"
+
+  - id: agent_job_failed
+    engines: [mssql]
+    metric: agent_job_failures_15m
+    op: ">"
+    threshold: 0
+    severity: P3
+    title: "SQL Agent job failed"
+
+  - id: tempdb_low
+    engines: [mssql]
+    metric: tempdb_free_mb
+    op: "<"
+    threshold: 1024
+    for_cycles: 2
+    severity: P2
+    title: "tempdb free space below 1 GB"
+
+  - id: active_sessions_anomaly
+    engines: [postgres, mysql, mssql]
+    type: anomaly
+    metric: active_sessions
+    z_score: 4
+    min_samples: 100
+    severity: P4
+    title: "Active sessions far above normal"

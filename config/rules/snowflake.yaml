@@ -1,0 +1,67 @@
+rules:
+  - id: sf_warehouse_queuing
+    engines: [snowflake]
+    metric: warehouse_queued_load
+    op: ">"
+    threshold: 0.5
+    for_cycles: 2
+    severity: P3
+    title: "Warehouse queries are queuing (undersized or overloaded warehouse)"
+
+  - id: sf_remote_spill
+    engines: [snowflake]
+    metric: remote_spill_gb_1h
+    op: ">"
+    threshold: 1
+    severity: P3
+    title: "Queries spilling to remote storage (last hour)"
+
+  - id: sf_long_running
+    engines: [snowflake]
+    metric: longest_query_seconds
+    op: ">"
+    threshold: 1800
+    severity: P3
+    title: "Snowflake query running longer than 30 minutes"
+
+  - id: sf_queued_queries
+    engines: [snowflake]
+    metric: queued_queries
+    op: ">="
+    threshold: 10
+    for_cycles: 2
+    severity: P2
+    title: "Ten or more queries queued"
+
+  - id: sf_task_failures
+    engines: [snowflake]
+    metric: task_failures_30m
+    op: ">"
+    threshold: 0
+    severity: P3
+    title: "Snowflake task failed"
+
+  - id: sf_failed_logins
+    engines: [snowflake]
+    metric: failed_logins_30m
+    op: ">="
+    threshold: 20
+    severity: P2
+    title: "Burst of failed Snowflake logins"
+
+  - id: sf_credit_spike
+    engines: [snowflake]
+    type: anomaly
+    metric: warehouse_credits_1h
+    z_score: 3
+    min_samples: 48
+    severity: P3
+    title: "Warehouse credit burn far above normal"
+
+  - id: sf_query_failures
+    engines: [snowflake]
+    metric: failed_queries_15m
+    op: ">="
+    threshold: 25
+    severity: P3
+    title: "Many failed Snowflake queries"

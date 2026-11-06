@@ -1,0 +1,38 @@
+# Local fault lab: PostgreSQL, MySQL and SQL Server with read-only monitor users.
+# Start:  docker compose -f lab/docker-compose.yml up -d
+# Then:   python lab/setup_mssql.py   (SQL Server has no init-script hook)
+services:
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_PASSWORD: labpass
+      POSTGRES_DB: labdb
+    command: ["postgres", "-c", "shared_preload_libraries=pg_stat_statements", "-c", "pg_stat_statements.track=all"]
+    ports: ["55432:5432"]
+    volumes:
+      - ./init/postgres.sql:/docker-entrypoint-initdb.d/10-init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d labdb"]
+      interval: 5s
+      retries: 20
+
+  mysql:
+    image: mysql:8.4
+    environment:
+      MYSQL_ROOT_PASSWORD: labpass
+      MYSQL_DATABASE: labdb
+    ports: ["33306:3306"]
+    volumes:
+      - ./init/mysql.sql:/docker-entrypoint-initdb.d/10-init.sql:ro
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-plabpass"]
+      interval: 5s
+      retries: 30
+
+  mssql:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    environment:
+      ACCEPT_EULA: "Y"
+      MSSQL_SA_PASSWORD: "Lab_pass1!"
+      MSSQL_PID: Developer
+    ports: ["14330:1433"]

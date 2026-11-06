@@ -1,0 +1,51 @@
+# Global settings. ${VAR} and ${VAR:-default} are expanded from the environment.
+state_db_url: ${MONITOR_DB_URL:-sqlite:///monitor_state.db}
+targets_file: config/targets.yaml
+rules_dir: config/rules
+governance_file: config/governance.yaml
+runbooks_dir: runbooks
+
+scheduler:
+  fast_interval_seconds: 60      # sessions, blocking, long-running
+  slow_interval_seconds: 600     # top queries, cost, job history
+  governance_cron_hour: 6        # daily inactive-user job (local time)
+
+incidents:
+  cooldown_minutes: 30           # suppress re-notification for the same incident
+  auto_resolve_minutes: 15       # resolve when the condition has not fired for this long
+
+llm:
+  enabled: true
+  model: claude-opus-5-5
+  effort: high
+  max_tokens: 16000
+  max_tool_calls: 15
+  max_turns: 20
+  server_side_fallback: true     # retry on another model if a request is declined by safety classifiers
+  investigate_min_severity: P3   # P1..P4; incidents at or above this severity get an AI investigation
+
+tool_limits:
+  max_rows: 200
+  statement_timeout_seconds: 30
+  max_result_chars: 20000
+
+notifications:
+  dashboard_url: ${MONITOR_DASHBOARD_URL:-http://localhost:8080}
+  routes:
+    P1: [pagerduty, email, slack, teams]
+    P2: [pagerduty, email, slack, teams]
+    P3: [slack, teams]
+    P4: [slack]
+  slack:
+    webhook_url: ${SLACK_WEBHOOK_URL:-}
+  teams:
+    webhook_url: ${TEAMS_WEBHOOK_URL:-}
+  pagerduty:
+    routing_key: ${PAGERDUTY_ROUTING_KEY:-}
+  email:
+    smtp_host: ${SMTP_HOST:-}
+    smtp_port: ${SMTP_PORT:-587}
+    smtp_user: ${SMTP_USER:-}
+    smtp_password: ${SMTP_PASSWORD:-}
+    from_addr: ${ALERT_EMAIL_FROM:-}
+    to_addrs: ${ALERT_EMAIL_TO:-}

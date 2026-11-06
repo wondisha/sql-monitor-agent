@@ -1,0 +1,77 @@
+# Each target has two credential sets:
+#   monitor  - read-only role used by collectors and the AI agent
+#   executor - privileged role used ONLY after a human approves an action
+# Set enabled: false for targets you don't run.
+
+targets:
+  - name: lab-postgres
+    engine: postgres
+    enabled: true
+    monitor:
+      host: localhost
+      port: 55432
+      dbname: labdb
+      user: monitor
+      password: ${PG_MONITOR_PASSWORD:-}
+    executor:
+      host: localhost
+      port: 55432
+      dbname: labdb
+      user: postgres
+      password: ${PG_EXECUTOR_PASSWORD:-}
+
+  - name: lab-mysql
+    engine: mysql
+    enabled: true
+    monitor:
+      host: 127.0.0.1
+      port: 33306
+      user: monitor          # no default database: the monitor user has no access to business schemas
+      password: ${MYSQL_MONITOR_PASSWORD:-}
+    executor:
+      host: 127.0.0.1
+      port: 33306
+      database: labdb
+      user: root
+      password: ${MYSQL_EXECUTOR_PASSWORD:-}
+
+  - name: lab-mssql
+    engine: mssql
+    enabled: true
+    monitor:
+      driver: ODBC Driver 18 for SQL Server
+      server: localhost,14330
+      database: labdb
+      user: monitor
+      password: ${MSSQL_MONITOR_PASSWORD:-}
+      trust_server_certificate: true
+    executor:
+      driver: ODBC Driver 18 for SQL Server
+      server: localhost,14330
+      database: labdb
+      user: sa
+      password: ${MSSQL_EXECUTOR_PASSWORD:-}
+      trust_server_certificate: true
+
+  # Snowflake is easiest to add from the dashboard (Targets -> Add server) as "prod-snowflake",
+  # the name config/governance.yaml uses for the inactive-user cleanup. File-based equivalent:
+  #
+  # - name: prod-snowflake
+  #   engine: snowflake
+  #   enabled: true
+  #   monitor:
+  #     account: ${SNOWFLAKE_ACCOUNT:-}
+  #     user: ${SNOWFLAKE_MONITOR_USER:-}
+  #     private_key_path: ${SNOWFLAKE_MONITOR_KEY_PATH:-}
+  #     role: MONITOR_ROLE
+  #     warehouse: MONITOR_WH        # keep this an XS warehouse
+  #     database: MONITOR_DB         # any database; needed for INFORMATION_SCHEMA table functions
+  #   executor:
+  #     account: ${SNOWFLAKE_ACCOUNT:-}
+  #     user: ${SNOWFLAKE_EXECUTOR_USER:-}
+  #     private_key_path: ${SNOWFLAKE_EXECUTOR_KEY_PATH:-}
+  #     role: GOV_EXECUTOR
+  #     warehouse: MONITOR_WH
+  #     database: MONITOR_DB
+  #   limits:
+  #     max_warehouse_size: LARGE    # executor will refuse to resize above this
