@@ -7,6 +7,8 @@ name = "sql-monitor-agent"
 version = "0.1.0"
 description = "Agentic monitoring and troubleshooting for Snowflake, PostgreSQL, MySQL and SQL Server"
 requires-python = ">=3.11"
+license = "MIT"
+license-files = ["LICENSE"]
 dependencies = [
   "anthropic>=0.70",
   "sqlalchemy>=2.0",
