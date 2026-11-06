@@ -10,3 +10,6 @@ __pycache__/
 config/targets_ui.yaml
 *.tmp
 
+build/
+dist/
+
