@@ -18,6 +18,8 @@ def build_scheduler(app: App) -> BackgroundScheduler:
 
     for name in app.registry.names():
         schedule_target(app, name)
+        # One full (fast + slow) collection right away, so a restart doesn't leave slow checks empty for 10 minutes.
+        sched.add_job(app.collect, args=[name, False, True], id=f"first:{name}", replace_existing=True)
 
     sched.add_job(app.run_governance, "cron", hour=int(cfg.get("governance_cron_hour", 6)), minute=0,
                   id="governance")

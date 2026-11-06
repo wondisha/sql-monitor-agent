@@ -7,6 +7,9 @@ _ACTION_PARAMS = {
     "cancel_query": '{"session_id": "<pid/spid>"}  (Snowflake: {"query_id": "<uuid>"})',
     "resize_warehouse": '{"warehouse": "<name>", "size": "XSMALL|SMALL|MEDIUM|LARGE|..."}',
     "suspend_warehouse": '{"warehouse": "<name>"}',
+    "set_warehouse_parameter": '{"warehouse": "<name>", "parameter": "AUTO_SUSPEND|AUTO_RESUME|'
+                               'STATEMENT_TIMEOUT_IN_SECONDS|STATEMENT_QUEUED_TIMEOUT_IN_SECONDS|MIN_CLUSTER_COUNT|'
+                               'MAX_CLUSTER_COUNT|SCALING_POLICY", "value": "<value>"}',
     "analyze_table": '{"table": "<schema.table>"}',
     "create_index_script": '{"table": "<schema.table>", "columns": ["col1", "col2"], "include": ["col3"]}',
 }

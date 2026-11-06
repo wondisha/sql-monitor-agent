@@ -78,7 +78,7 @@ Secrets come from environment variables / `.env` (`${VAR}` expansion in YAML). S
 | PostgreSQL | connections vs max, active sessions, blocking (`pg_blocking_pids`), longest query, idle-in-transaction, replication lag, deadlocks, dead-tuple bloat, `pg_stat_statements` |
 | MySQL | threads, blocking (`sys.innodb_lock_waits`), longest query/transaction, replica lag (NULL = stopped), deadlocks, digest stats, waits |
 | SQL Server | sessions, blocking chain, longest request, deadlocks (+ `system_health` XE graphs), AG lag, Agent job failures, tempdb free space, missing indexes, wait stats, cached plans |
-| Snowflake | running/queued/blocked queries, longest query, failed queries, remote spill, warehouse queued load, credits/hour (anomaly), task failures, failed logins, operator stats |
+| Snowflake | **Every minute, free (`SHOW` only):** running/queued queries per warehouse, lock waits. **Config audit, free:** auto-suspend, auto-resume, statement timeout, resource monitors (quota and suspend), multi-cluster at max. **Every 30 min (one short warehouse burst):** long-running/failed/blocked queries, credits/hour (anomaly), local and remote spill per warehouse, task failures, failed logins. **Every 6 h:** warehouse cache reuse, partition pruning, idle credits, cloud-services ratio. Approvable fix: `set_warehouse_parameter` (bounded) |
 
 ## Security model
 

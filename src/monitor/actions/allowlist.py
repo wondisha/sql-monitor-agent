@@ -125,6 +125,41 @@ def _suspend_warehouse(engine: str, p: dict, limits: dict) -> Rendered:
     return Rendered(sql, sql)
 
 
+# Settings an approved action may change, with bounds. Anything else is a recommendation, not an action.
+WAREHOUSE_PARAMS: dict[str, tuple] = {
+    "AUTO_SUSPEND": ("int", 60, 3600),
+    "AUTO_RESUME": ("enum", ("TRUE",)),                    # turning auto-resume OFF is never automated
+    "STATEMENT_TIMEOUT_IN_SECONDS": ("int", 60, 86400),
+    "STATEMENT_QUEUED_TIMEOUT_IN_SECONDS": ("int", 60, 86400),
+    "MIN_CLUSTER_COUNT": ("int", 1, 10),
+    "MAX_CLUSTER_COUNT": ("int", 1, 10),
+    "SCALING_POLICY": ("enum", ("STANDARD", "ECONOMY")),
+}
+
+
+def _set_warehouse_parameter(engine: str, p: dict, limits: dict) -> Rendered:
+    wh = _ident(p.get("warehouse", ""), "warehouse name")
+    param = str(p.get("parameter", "")).strip().upper()
+    if param not in WAREHOUSE_PARAMS:
+        raise ActionError(f"parameter must be one of {sorted(WAREHOUSE_PARAMS)}")
+    spec = WAREHOUSE_PARAMS[param]
+    raw = str(p.get("value", "")).strip().upper()
+    if spec[0] == "int":
+        try:
+            val = int(raw)
+        except ValueError:
+            raise ActionError(f"{param} needs a whole number") from None
+        if not spec[1] <= val <= spec[2]:
+            raise ActionError(f"{param} must be between {spec[1]} and {spec[2]}")
+        value = str(val)
+    else:
+        if raw not in spec[1]:
+            raise ActionError(f"{param} must be one of {list(spec[1])}")
+        value = f"'{raw}'" if param == "SCALING_POLICY" else raw
+    sql = f'ALTER WAREHOUSE "{wh}" SET {param} = {value}'
+    return Rendered(sql, sql)
+
+
 def _analyze_table(engine: str, p: dict, limits: dict) -> Rendered:
     parts = _qualified(p.get("table", ""))
     q = _quote(engine, parts)
@@ -175,6 +210,11 @@ ACTIONS: dict[str, ActionSpec] = {
     "suspend_warehouse": ActionSpec("suspend_warehouse", ("snowflake",), "medium",
                                     "Suspend a Snowflake warehouse (running queries finish first)",
                                     _suspend_warehouse, "ALTER WAREHOUSE ... RESUME"),
+    "set_warehouse_parameter": ActionSpec("set_warehouse_parameter", ("snowflake",), "low",
+                                          "Change one bounded warehouse setting (auto-suspend, auto-resume on, "
+                                          "statement timeouts, cluster counts, scaling policy)",
+                                          _set_warehouse_parameter,
+                                          "Set it back to the value shown under current_state in Preview."),
     "analyze_table": ActionSpec("analyze_table", ("postgres", "mysql", "mssql"), "low",
                                 "Refresh optimizer statistics for one table", _analyze_table,
                                 "None needed; statistics are refreshed again by autovacuum/auto-stats."),

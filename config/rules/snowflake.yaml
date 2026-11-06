@@ -1,20 +1,56 @@
+# Snowflake rules. Metric cadence (see adapters/snowflake.py for the cost model):
+#   every minute (free, SHOW): wh_queued_queries, queued_queries, active_sessions, blocked_sessions
+#   every 10 min (free, SHOW): wh_auto_suspend_seconds, wh_auto_resume_off, wh_no_resource_monitor,
+#                              wh_statement_timeout_seconds, wh_multicluster_at_max, rm_used_pct, rm_no_suspend
+#   every 30 min (warehouse):  longest_query_seconds, failed_queries_30m, blocked_queries, warehouse_credits_1h,
+#                              wh_local_spill_gb_1h, wh_remote_spill_gb_1h, task_failures_30m, failed_logins_30m
+#   every 6 h   (warehouse):   wh_cache_hit_pct_24h, wh_poor_pruning_queries_24h, wh_idle_credit_pct_24h,
+#                              cloud_services_pct_1d
 rules:
+  # ---- load and failures -------------------------------------------------------------
   - id: sf_warehouse_queuing
     engines: [snowflake]
-    metric: warehouse_queued_load
-    op: ">"
-    threshold: 0.5
+    metric: wh_queued_queries
+    op: ">="
+    threshold: 1
+    for_cycles: 3
+    severity: P3
+    title: "Warehouse has had queued queries for 3+ minutes (undersized or overloaded)"
+
+  - id: sf_queued_queries
+    engines: [snowflake]
+    metric: queued_queries
+    op: ">="
+    threshold: 10
+    for_cycles: 2
+    severity: P2
+    title: "Ten or more queries queued across the account"
+
+  - id: sf_multicluster_maxed
+    engines: [snowflake]
+    metric: wh_multicluster_at_max
+    op: "=="
+    threshold: 1
     for_cycles: 2
     severity: P3
-    title: "Warehouse queries are queuing (undersized or overloaded warehouse)"
+    title: "Multi-cluster warehouse is at MAX_CLUSTER_COUNT and still queuing"
 
-  - id: sf_remote_spill
+  - id: sf_blocked_sessions
     engines: [snowflake]
-    metric: remote_spill_gb_1h
-    op: ">"
-    threshold: 1
+    metric: blocked_sessions
+    op: ">="
+    threshold: 3
+    for_cycles: 2
     severity: P3
-    title: "Queries spilling to remote storage (last hour)"
+    title: "Transactions waiting on locks"
+
+  - id: sf_blocked_queries
+    engines: [snowflake]
+    metric: blocked_queries
+    op: ">="
+    threshold: 3
+    severity: P3
+    title: "Queries blocked on locks in the last 30 minutes"
 
   - id: sf_long_running
     engines: [snowflake]
@@ -24,14 +60,13 @@ rules:
     severity: P3
     title: "Snowflake query running longer than 30 minutes"
 
-  - id: sf_queued_queries
+  - id: sf_query_failures
     engines: [snowflake]
-    metric: queued_queries
+    metric: failed_queries_30m
     op: ">="
-    threshold: 10
-    for_cycles: 2
-    severity: P2
-    title: "Ten or more queries queued"
+    threshold: 25
+    severity: P3
+    title: "Many failed Snowflake queries in the last 30 minutes"
 
   - id: sf_task_failures
     engines: [snowflake]
@@ -49,6 +84,24 @@ rules:
     severity: P2
     title: "Burst of failed Snowflake logins"
 
+  # ---- spillage ----------------------------------------------------------------------
+  - id: sf_local_spill
+    engines: [snowflake]
+    metric: wh_local_spill_gb_1h
+    op: ">"
+    threshold: 5
+    severity: P4
+    title: "Warehouse spilling to local disk (early sign of memory pressure)"
+
+  - id: sf_remote_spill
+    engines: [snowflake]
+    metric: wh_remote_spill_gb_1h
+    op: ">"
+    threshold: 1
+    severity: P3
+    title: "Warehouse spilling to remote storage (queries much slower and costlier)"
+
+  # ---- cost --------------------------------------------------------------------------
   - id: sf_credit_spike
     engines: [snowflake]
     type: anomaly
@@ -56,12 +109,86 @@ rules:
     z_score: 3
     min_samples: 48
     severity: P3
-    title: "Warehouse credit burn far above normal"
+    title: "Warehouse credit burn far above its normal level"
 
-  - id: sf_query_failures
+  - id: sf_idle_credits
     engines: [snowflake]
-    metric: failed_queries_15m
+    metric: wh_idle_credit_pct_24h
+    op: ">"
+    threshold: 40
+    severity: P4
+    title: "Over 40% of warehouse credits spent idle (no queries running)"
+
+  - id: sf_cloud_services_high
+    engines: [snowflake]
+    metric: cloud_services_pct_1d
+    op: ">"
+    threshold: 10
+    severity: P4
+    title: "Cloud services above the 10% free allowance (billed separately)"
+
+  - id: sf_resource_monitor_near_quota
+    engines: [snowflake]
+    metric: rm_used_pct
     op: ">="
-    threshold: 25
+    threshold: 90
     severity: P3
-    title: "Many failed Snowflake queries"
+    title: "Resource monitor at 90%+ of its credit quota"
+
+  # ---- efficiency --------------------------------------------------------------------
+  - id: sf_low_cache_hit
+    engines: [snowflake]
+    metric: wh_cache_hit_pct_24h
+    op: "<"
+    threshold: 10
+    severity: P4
+    title: "Low warehouse cache reuse (check auto-suspend vs. workload pattern)"
+
+  - id: sf_poor_pruning
+    engines: [snowflake]
+    metric: wh_poor_pruning_queries_24h
+    op: ">="
+    threshold: 20
+    severity: P4
+    title: "Many queries scanning 80%+ of partitions on large tables (clustering candidates)"
+
+  # ---- configuration audit -----------------------------------------------------------
+  - id: sf_auto_suspend_high
+    engines: [snowflake]
+    metric: wh_auto_suspend_seconds
+    op: ">"
+    threshold: 600
+    severity: P4
+    title: "Warehouse auto-suspend above 10 minutes or disabled (idle credit burn)"
+
+  - id: sf_auto_resume_off
+    engines: [snowflake]
+    metric: wh_auto_resume_off
+    op: "=="
+    threshold: 1
+    severity: P4
+    title: "Warehouse auto-resume is off (queries fail until someone resumes it)"
+
+  - id: sf_no_resource_monitor
+    engines: [snowflake]
+    metric: wh_no_resource_monitor
+    op: "=="
+    threshold: 1
+    severity: P4
+    title: "Warehouse has no resource monitor (no credit cap)"
+
+  - id: sf_resource_monitor_no_suspend
+    engines: [snowflake]
+    metric: rm_no_suspend
+    op: "=="
+    threshold: 1
+    severity: P4
+    title: "Resource monitor only notifies and never suspends"
+
+  - id: sf_statement_timeout_default
+    engines: [snowflake]
+    metric: wh_statement_timeout_seconds
+    op: ">"
+    threshold: 14400
+    severity: P4
+    title: "Statement timeout above 4 hours (Snowflake default is 2 days)"

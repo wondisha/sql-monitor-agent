@@ -50,7 +50,14 @@ class Executor:
             out = {"id": rec.id, "sql": rec.rendered_sql, "status": rec.status, "risk": rec.risk,
                    "rollback": rec.rollback, "target": rec.target}
             sid = rec.params.get("session_id") or rec.params.get("query_id")
-        if sid is not None:
+            warehouse = rec.params.get("warehouse")
+        adapter = self.registry.get(out["target"])
+        if warehouse and hasattr(adapter, "warehouse_state"):
+            try:   # current settings double as the rollback values
+                out["current_state"] = adapter.warehouse_state(str(warehouse))
+            except Exception as e:  # noqa: BLE001
+                out["current_state_error"] = str(e)[:300]
+        elif sid is not None:
             try:
                 out["current_state"] = self.registry.get(out["target"]).get_session(str(sid))
                 if not out["current_state"]:
