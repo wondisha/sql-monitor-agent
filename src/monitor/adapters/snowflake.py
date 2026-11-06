@@ -143,12 +143,27 @@ class SnowflakeAdapter(EngineAdapter):
             running, queued = running + r, queued + q
             m += [Metric("wh_running_queries", r, lab), Metric("wh_queued_queries", q, lab)]
         m += [Metric("active_sessions", running), Metric("queued_queries", queued)]
-        try:   # needs MONITOR ON ACCOUNT; without it, blocked queries come from the 30-minute pass
-            locks = self.query("SHOW LOCKS IN ACCOUNT", max_rows=10000)
+        # Needs MONITOR ON ACCOUNT; without it, blocked queries come from the 30-minute pass.
+        locks = self._try("locks", "SHOW LOCKS IN ACCOUNT")
+        if locks is not None:
             m.append(Metric("blocked_sessions", sum(1 for x in locks if str(x.get("status", "")).upper() == "WAITING")))
-        except Exception:  # noqa: BLE001
-            pass
         return m
+
+    def _try(self, key: str, sql: str, backoff_s: int = 3600) -> list[dict] | None:
+        """Run an optional check. On a permission error, don't retry it for backoff_s: every refused statement is
+        recorded as a failed query in the customer's history (and would trip the failed-queries rule)."""
+        denied = self.__dict__.setdefault("_denied_until", {})
+        if denied.get(key, 0) > time.monotonic():
+            return None
+        try:
+            return self.query(sql, max_rows=10000)
+        except Exception as e:  # noqa: BLE001
+            if "insufficient privileges" in str(e).lower() or "access control" in str(e).lower():
+                denied[key] = time.monotonic() + backoff_s
+                log.info("%s: %s not permitted; retrying in %ss", self.target.name, key, backoff_s)
+            else:
+                log.debug("%s: optional check %s failed: %s", self.target.name, key, e)
+            return None
 
     def collect_slow(self) -> list[Metric]:
         heavy_s, daily_s = self._intervals()
@@ -170,7 +185,7 @@ class SnowflakeAdapter(EngineAdapter):
                             1 if str(w.get("resource_monitor") or "null").lower() in ("null", "", "none") else 0, lab))
             # Reading a warehouse's own parameters needs USAGE on it. If we can't read it, say so rather than
             # assume the account default (a warehouse-level value we can't see would make that a false alarm).
-            p = self.safe(f"SHOW PARAMETERS LIKE 'STATEMENT_TIMEOUT_IN_SECONDS' IN WAREHOUSE {_q(name)}")
+            p = self._try(f"params:{name}", f"SHOW PARAMETERS LIKE 'STATEMENT_TIMEOUT_IN_SECONDS' IN WAREHOUSE {_q(name)}")
             if p:
                 m.append(Metric("wh_statement_timeout_seconds", _num(p[0].get("value"), acct_timeout), lab))
             m.append(Metric("wh_settings_unreadable", 0 if p else 1, lab))
@@ -197,7 +212,8 @@ class SnowflakeAdapter(EngineAdapter):
                    COUNT_IF(execution_status LIKE 'FAILED%%') AS failed,
                    COUNT_IF(execution_status = 'BLOCKED') AS blocked
             FROM TABLE(INFORMATION_SCHEMA.QUERY_HISTORY(
-                END_TIME_RANGE_START => DATEADD('minute', -30, CURRENT_TIMESTAMP()), RESULT_LIMIT => 1000))""")[0]
+                END_TIME_RANGE_START => DATEADD('minute', -30, CURRENT_TIMESTAMP()), RESULT_LIMIT => 1000))
+            WHERE user_name <> CURRENT_USER()""")[0]   # never count the monitor's own queries
         m += [Metric("longest_query_seconds", q["longest"]), Metric("failed_queries_30m", q["failed"]),
               Metric("blocked_queries", q["blocked"])]
         for r in self.safe("""

@@ -31,7 +31,7 @@ class FakeSnowflake(SnowflakeAdapter):
     def query(self, sql, params=None, max_rows=None):
         self.sql.append(sql)
         if "SHOW LOCKS" in sql and self.lock_error:
-            raise RuntimeError("needs MONITOR ON ACCOUNT")
+            raise RuntimeError("SQL access control error: Insufficient privileges to operate on account")
         for key, val in self.responses.items():
             if key in sql:
                 return val(sql) if callable(val) else val
@@ -61,6 +61,8 @@ def test_fast_cycle_uses_only_free_show_commands():
     assert got[("blocked_sessions", "")] == 2
     a2 = FakeSnowflake(BASE, lock_error=True)
     assert ("blocked_sessions", "") not in metrics(a2.collect_fast())         # missing grant -> skipped, no crash
+    a2.collect_fast()
+    assert sum("SHOW LOCKS" in s for s in a2.sql) == 1                        # refused once, then backed off
 
 
 def test_config_audit_findings():
