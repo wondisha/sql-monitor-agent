@@ -185,6 +185,14 @@ rules:
     severity: P4
     title: "Resource monitor only notifies and never suspends"
 
+  - id: sf_settings_unreadable
+    engines: [snowflake]
+    metric: wh_settings_unreadable
+    op: "=="
+    threshold: 1
+    severity: P4
+    title: "Monitor cannot read this warehouse's statement timeout (grant USAGE on it to MONITOR_ROLE)"
+
   - id: sf_statement_timeout_default
     engines: [snowflake]
     metric: wh_statement_timeout_seconds

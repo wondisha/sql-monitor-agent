@@ -11,9 +11,13 @@ CREATE ROLE IF NOT EXISTS MONITOR_ROLE;
 GRANT IMPORTED PRIVILEGES ON DATABASE SNOWFLAKE TO ROLE MONITOR_ROLE;   -- ACCOUNT_USAGE views (needs ACCOUNTADMIN)
 GRANT MONITOR USAGE ON ACCOUNT TO ROLE MONITOR_ROLE;                    -- metering / load history
 GRANT MONITOR EXECUTION ON ACCOUNT TO ROLE MONITOR_ROLE;                -- task history for all tasks
--- MONITOR on each warehouse lets INFORMATION_SCHEMA.QUERY_HISTORY show other users' queries on it, and lets the
--- configuration audit read each warehouse's own STATEMENT_TIMEOUT_IN_SECONDS (otherwise the account value is used):
+-- MONITOR on each warehouse lets INFORMATION_SCHEMA.QUERY_HISTORY show other users' queries on it:
 -- GRANT MONITOR ON WAREHOUSE <each_warehouse> TO ROLE MONITOR_ROLE;
+-- USAGE on each warehouse lets the configuration audit read its STATEMENT_TIMEOUT_IN_SECONDS (SHOW PARAMETERS
+-- IN WAREHOUSE requires USAGE; MONITOR is not enough). The monitor never runs queries on these warehouses.
+-- GRANT USAGE ON WAREHOUSE <each_warehouse> TO ROLE MONITOR_ROLE;
+-- Resource monitors are only visible to roles with MONITOR on them:
+-- GRANT MONITOR ON RESOURCE MONITOR <monitor> TO ROLE MONITOR_ROLE;
 -- Optional: free, per-minute lock/blocking detection via SHOW LOCKS IN ACCOUNT (otherwise every 30 minutes):
 -- GRANT MONITOR ON ACCOUNT TO ROLE MONITOR_ROLE;
 

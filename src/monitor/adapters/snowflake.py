@@ -34,6 +34,7 @@ def _num(v, default: float = 0) -> float:
 def _q(name: str) -> str:
     return '"' + str(name).replace('"', '""') + '"'
 
+
 RECENT_QUERIES = """
 SELECT query_id, user_name, role_name, warehouse_name, warehouse_size, execution_status,
        start_time, total_elapsed_time / 1000 AS elapsed_seconds, queued_overload_time / 1000 AS queued_seconds,
@@ -167,9 +168,12 @@ class SnowflakeAdapter(EngineAdapter):
             m.append(Metric("wh_auto_resume_off", 0 if str(w.get("auto_resume")).lower() == "true" else 1, lab))
             m.append(Metric("wh_no_resource_monitor",
                             1 if str(w.get("resource_monitor") or "null").lower() in ("null", "", "none") else 0, lab))
+            # Reading a warehouse's own parameters needs USAGE on it. If we can't read it, say so rather than
+            # assume the account default (a warehouse-level value we can't see would make that a false alarm).
             p = self.safe(f"SHOW PARAMETERS LIKE 'STATEMENT_TIMEOUT_IN_SECONDS' IN WAREHOUSE {_q(name)}")
-            m.append(Metric("wh_statement_timeout_seconds", _num(p[0].get("value"), acct_timeout) if p else acct_timeout,
-                            lab))
+            if p:
+                m.append(Metric("wh_statement_timeout_seconds", _num(p[0].get("value"), acct_timeout), lab))
+            m.append(Metric("wh_settings_unreadable", 0 if p else 1, lab))
             max_c, started = _num(w.get("max_cluster_count"), 1), _num(w.get("started_clusters"))
             m.append(Metric("wh_multicluster_at_max",
                             1 if max_c > 1 and started >= max_c and _num(w.get("queued")) > 0 else 0, lab))

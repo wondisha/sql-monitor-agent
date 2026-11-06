@@ -71,7 +71,8 @@ def test_config_audit_findings():
     assert got[("wh_auto_resume_off", "BI_WH")] == 1 and got[("wh_auto_resume_off", "ETL_WH")] == 0
     assert got[("wh_no_resource_monitor", "BI_WH")] == 1 and got[("wh_no_resource_monitor", "ETL_WH")] == 0
     assert got[("wh_statement_timeout_seconds", "ETL_WH")] == 3600            # warehouse-level value
-    assert got[("wh_statement_timeout_seconds", "BI_WH")] == 172800           # falls back to account value
+    assert ("wh_statement_timeout_seconds", "BI_WH") not in got               # unreadable: never guessed
+    assert got[("wh_settings_unreadable", "BI_WH")] == 1 and got[("wh_settings_unreadable", "ETL_WH")] == 0
     assert got[("wh_multicluster_at_max", "NEVER_WH")] == 1                   # at max and queuing
     assert got[("wh_multicluster_at_max", "BI_WH")] == 0                      # at max but not queuing
     assert got[("rm_used_pct", "RM1")] == 95 and got[("rm_no_suspend", "RM1")] == 1
@@ -119,9 +120,10 @@ def test_rules_fire_on_the_new_metrics():
     fired = {(e.rule.id, e.metric.labels.get("warehouse") or e.metric.labels.get("monitor", ""))
              for e in eng.evaluate("sf1", "snowflake", a._config_audit())}
     assert {("sf_auto_suspend_high", "BI_WH"), ("sf_auto_suspend_high", "NEVER_WH"), ("sf_auto_resume_off", "BI_WH"),
-            ("sf_no_resource_monitor", "BI_WH"), ("sf_statement_timeout_default", "BI_WH"),
+            ("sf_no_resource_monitor", "BI_WH"), ("sf_settings_unreadable", "BI_WH"),
             ("sf_resource_monitor_near_quota", "RM1"), ("sf_resource_monitor_no_suspend", "RM1")} <= fired
     assert ("sf_auto_suspend_high", "ETL_WH") not in fired and ("sf_no_resource_monitor", "ETL_WH") not in fired
+    assert ("sf_statement_timeout_default", "BI_WH") not in fired             # no false alarm when unreadable
 
 
 def test_set_warehouse_parameter_action():
