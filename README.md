@@ -13,6 +13,11 @@ Agentic monitoring and troubleshooting for **Snowflake, PostgreSQL, MySQL and SQ
 - **Snowflake user governance.** Users inactive for 90 days are flagged, then (after approval) their grants are
   snapshotted and the user is disabled. After a grace period all roles are revoked and the user is dropped.
 
+![The agent's root-cause analysis of a live Postgres blocking incident, with the proposed fix waiting for approval](docs/screenshots/blog-1-ai-analysis-and-fix.png)
+
+*A real run against the fault lab: detected at 22:14:29, diagnosed by the agent 20 seconds later, fix approved
+at 22:16:32, incident closed at 22:16:33. More screenshots in [docs/screenshots](docs/screenshots).*
+
 ```
  Engines ──poll──► Collectors ──metrics──► Rules + baselines ──► Incidents ──► Investigator (Claude, read-only)
     ▲                                                                │                 │ RCA + proposals
